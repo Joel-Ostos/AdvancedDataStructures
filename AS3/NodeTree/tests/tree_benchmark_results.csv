@@ -1,0 +1,12 @@
+n,nodeTree_insert_median,leafTree_insert_median,nodeTree_successful_search_median,leafTree_successful_search_median,nodeTree_unsuccessful_search_median,leafTree_unsuccessful_search_median,nodeTree_delete_median,leafTree_delete_median
+1,171,150,81,100,40,40,270,60
+10,95,145.5,60,90,70,70.5,90,95.5
+10,85,131,80.5,90,60.5,65,85,80
+50,130,150,90,105.5,90,91,110.5,100
+100,140,160,100,120,91,100,120,100.5
+100,141,161,100,120,100,100.5,120,100
+500,170,180,120,140,130,130,140,120
+1000,181,191,130,160,101,100,110,90
+5000,160,151,120,130,270,220,260,161
+10000,201,220,160,201,210,171,300,221
+100000,451,291,421,391,662,300,531,270
