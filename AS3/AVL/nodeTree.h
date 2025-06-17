@@ -11,8 +11,10 @@ class nodeT {
     B val;
     nodeT* left;
     nodeT* right;
+    int height;
     
-    nodeT(T nkey, B nval, nodeT* nleft = nullptr, nodeT* nright = nullptr);
+    nodeT(T nkey, B nval, nodeT* nleft = nullptr, nodeT* nright = nullptr) 
+        : key(nkey), val(nval), left(nleft), right(nright), height(1) {}
 };
 
 template<typename T, typename B>
@@ -50,9 +52,6 @@ class nodeTree {
     void destroyTree(nodeT<T, B>* actual);
 };
 
-template<typename T, typename B>
-nodeT<T,B>::nodeT(T nkey, B nval, nodeT* nleft, nodeT* nright) : 
-    key(nkey), val(nval), left(nleft), right(nright) {}
 
 template<typename T, typename B>
 nodeTree<T,B>::nodeTree(nodeT<T,B>* nnode) : root(nnode), size(nnode ? 1 : 0) {}

@@ -71,11 +71,7 @@ AVLTree<T, B>::~AVLTree() {}
 template<typename T, typename B>
 int AVLTree<T, B>::getHeight(nodeT<T, B>* node) {
     if (node == nullptr) return 0;
-    
-    // Para nodeTree, calculamos la altura recursivamente
-    int leftHeight = getHeight(node->left);
-    int rightHeight = getHeight(node->right);
-    return 1 + std::max(leftHeight, rightHeight);
+    return node->height;
 }
 
 template<typename T, typename B>
@@ -86,8 +82,9 @@ int AVLTree<T, B>::getBalance(nodeT<T, B>* node) {
 
 template<typename T, typename B>
 void AVLTree<T, B>::setHeight(nodeT<T, B>* node) {
-    // Para nodeTree no necesitamos almacenar altura explícitamente
-    // se calcula dinámicamente
+    if (node != nullptr) {
+        node->height = 1 + std::max(getHeight(node->left), getHeight(node->right));
+    }
 }
 
 template<typename T, typename B>
@@ -98,6 +95,10 @@ nodeT<T, B>* AVLTree<T, B>::rotateRight(nodeT<T, B>* y) {
     // Realizar rotación
     x->right = y;
     y->left = T2;
+    
+    // ¡ACTUALIZAR ALTURAS!
+    setHeight(y);
+    setHeight(x);
     
     return x;
 }
@@ -111,6 +112,10 @@ nodeT<T, B>* AVLTree<T, B>::rotateLeft(nodeT<T, B>* x) {
     y->left = x;
     x->right = T2;
     
+    // ¡ACTUALIZAR ALTURAS!
+    setHeight(x);
+    setHeight(y);
+    
     return y;
 }
 
@@ -119,7 +124,7 @@ nodeT<T, B>* AVLTree<T, B>::insertAVL(T key, B val, nodeT<T, B>* node) {
     // 1. Inserción normal de BST
     if (node == nullptr) {
         baseTree.incrementSize();
-        return new nodeT<T, B>(key, val);
+        return new nodeT<T, B>(key, val);  // height ya se inicializa en 1
     }
     
     if (key < node->key) {
@@ -132,10 +137,13 @@ nodeT<T, B>* AVLTree<T, B>::insertAVL(T key, B val, nodeT<T, B>* node) {
         return node;
     }
     
+    // ¡ACTUALIZAR ALTURA DESPUÉS DE INSERCIÓN!
+    setHeight(node);
+    
     // 2. Obtener el factor de balance
     int balance = getBalance(node);
     
-    // 3. Si el nodo se desbalanceó, hay 4 casos
+    // 3. Rotaciones (ya actualizan alturas internamente)
     
     // Caso Left Left
     if (balance > 1 && key < node->left->key) {
@@ -206,6 +214,7 @@ nodeT<T, B>* AVLTree<T, B>::deleteAVL(T key, nodeT<T, B>* node) {
         }
     }
     
+    setHeight(node);
     if (node == nullptr) return node;
     
     // 2. Obtener el factor de balance
@@ -240,7 +249,6 @@ nodeT<T, B>* AVLTree<T, B>::deleteAVL(T key, nodeT<T, B>* node) {
 
 #else
 
-// Especialización para leafTree
 template<typename T, typename B>
 AVLTree<T, B>::AVLTree() : baseTree() {}
 
@@ -251,7 +259,7 @@ template<typename T, typename B>
 int AVLTree<T, B>::getHeight(node<T, B>* n) {
     if (n == nullptr) return 0;
     
-    // Para leafTree, solo las hojas cuentan para la altura
+    // Para leafTree, las hojas tienen altura 1
     if (n->leaf) return 1;
     
     int leftHeight = getHeight(n->left);
@@ -268,6 +276,7 @@ int AVLTree<T, B>::getBalance(node<T, B>* n) {
 template<typename T, typename B>
 void AVLTree<T, B>::setHeight(node<T, B>* n) {
     // Para leafTree no necesitamos almacenar altura explícitamente
+    // ya que se calcula dinámicamente
 }
 
 template<typename T, typename B>
@@ -278,6 +287,11 @@ node<T, B>* AVLTree<T, B>::rotateRight(node<T, B>* y) {
     // Realizar rotación
     x->right = y;
     y->left = T2;
+    
+    // Actualizar la clave del nodo y después de la rotación
+    // En leafTree, los nodos internos mantienen la clave máxima de su subárbol
+    updateInternalNodeKey(y);
+    updateInternalNodeKey(x);
     
     return x;
 }
@@ -291,27 +305,51 @@ node<T, B>* AVLTree<T, B>::rotateLeft(node<T, B>* x) {
     y->left = x;
     x->right = T2;
     
+    // Actualizar claves después de la rotación
+    updateInternalNodeKey(x);
+    updateInternalNodeKey(y);
+    
     return y;
 }
 
 template<typename T, typename B>
-node<T, B>* AVLTree<T, B>::insertAVL(T key, B val, node<T, B>* n) {
-    // Para leafTree, la inserción es más compleja debido a su estructura especial
-    // Necesitamos adaptar la lógica de inserción manteniendo el balance AVL
+void AVLTree<T, B>::updateInternalNodeKey(node<T, B>* n) {
+    if (n == nullptr || n->leaf) return;
     
+    // Para leafTree, la clave del nodo interno debe ser la máxima de su subárbol derecho
+    node<T, B>* rightmost = n->right;
+    while (rightmost != nullptr && !rightmost->leaf) {
+        rightmost = rightmost->right;
+    }
+    
+    if (rightmost != nullptr) {
+        n->key = rightmost->key;
+    }
+}
+
+template<typename T, typename B>
+node<T, B>* AVLTree<T, B>::insertAVL(T key, B val, node<T, B>* n) {
+    // Caso base: árbol vacío
     if (n == nullptr) {
         baseTree.incrementSize();
         return new node<T, B>(key, val, nullptr, nullptr, true);
     }
     
-    // Inserción usando la lógica de leafTree pero con balance AVL
+    // Si llegamos a una hoja, necesitamos expandirla
     if (n->leaf) {
-        // Crear nuevo nodo interno y reorganizar
-        node<T, B>* newInternal = new node<T, B>(std::max(key, n->key), B{}, nullptr, nullptr, false);
-        node<T, B>* newLeaf = new node<T, B>(key, val, nullptr, nullptr, true);
+        // No insertar duplicados
+        if (n->key == key) {
+            n->val = val;  // Actualizar valor
+            return n;
+        }
         
         baseTree.incrementSize();
         
+        // Crear nuevo nodo interno
+        node<T, B>* newInternal = new node<T, B>(std::max(key, n->key), B{}, nullptr, nullptr, false);
+        node<T, B>* newLeaf = new node<T, B>(key, val, nullptr, nullptr, true);
+        
+        // Organizar los hijos según las claves
         if (key < n->key) {
             newInternal->left = newLeaf;
             newInternal->right = n;
@@ -323,35 +361,37 @@ node<T, B>* AVLTree<T, B>::insertAVL(T key, B val, node<T, B>* n) {
         return newInternal;
     }
     
-    // Navegación en nodo interno
+    // Navegación en nodo interno (similar a BST)
     if (key <= n->key) {
         n->left = insertAVL(key, val, n->left);
     } else {
         n->right = insertAVL(key, val, n->right);
     }
     
-    // Actualizar clave del nodo interno si es necesario
-    if (n->right && n->right->leaf) {
-        n->key = n->right->key;
-    }
+    // Actualizar la clave del nodo interno
+    updateInternalNodeKey(n);
     
-    // Verificar balance y rotar si es necesario
+    // Verificar balance y aplicar rotaciones si es necesario
     int balance = getBalance(n);
     
-    if (balance > 1 && key <= n->left->key) {
+    // Rotación derecha (Left-Left case)
+    if (balance > 1 && key <= (n->left ? n->left->key : key)) {
         return rotateRight(n);
     }
     
-    if (balance < -1 && key > n->right->key) {
+    // Rotación izquierda (Right-Right case)
+    if (balance < -1 && key > (n->right ? n->right->key : key)) {
         return rotateLeft(n);
     }
     
-    if (balance > 1 && key > n->left->key) {
+    // Rotación Left-Right
+    if (balance > 1 && key > (n->left ? n->left->key : key)) {
         n->left = rotateLeft(n->left);
         return rotateRight(n);
     }
     
-    if (balance < -1 && key <= n->right->key) {
+    // Rotación Right-Left
+    if (balance < -1 && key <= (n->right ? n->right->key : key)) {
         n->right = rotateRight(n->right);
         return rotateLeft(n);
     }
@@ -363,6 +403,7 @@ template<typename T, typename B>
 node<T, B>* AVLTree<T, B>::getMinNode(node<T, B>* n) {
     if (n == nullptr) return nullptr;
     
+    // Ir hasta la hoja más a la izquierda
     while (n->left != nullptr) {
         n = n->left;
     }
@@ -371,9 +412,9 @@ node<T, B>* AVLTree<T, B>::getMinNode(node<T, B>* n) {
 
 template<typename T, typename B>
 node<T, B>* AVLTree<T, B>::deleteAVL(T key, node<T, B>* n) {
-    // Implementación de eliminación para leafTree con balance AVL
     if (n == nullptr) return nullptr;
     
+    // Si es una hoja
     if (n->leaf) {
         if (n->key == key) {
             baseTree.decrementSize();
@@ -390,7 +431,7 @@ node<T, B>* AVLTree<T, B>::deleteAVL(T key, node<T, B>* n) {
         n->right = deleteAVL(key, n->right);
     }
     
-    // Si un hijo se vuelve nullptr, colapsar el nodo
+    // Manejar el caso donde un hijo se vuelve nullptr
     if (n->left == nullptr && n->right != nullptr) {
         node<T, B>* temp = n->right;
         delete n;
@@ -402,27 +443,35 @@ node<T, B>* AVLTree<T, B>::deleteAVL(T key, node<T, B>* n) {
         return temp;
     }
     
-    // Actualizar clave del nodo interno
-    if (n->right && n->right->leaf) {
-        n->key = n->right->key;
+    // Si ambos hijos son nullptr, el nodo debe ser eliminado
+    if (n->left == nullptr && n->right == nullptr) {
+        delete n;
+        return nullptr;
     }
     
-    // Verificar balance
+    // Actualizar la clave del nodo interno
+    updateInternalNodeKey(n);
+    
+    // Verificar balance y aplicar rotaciones
     int balance = getBalance(n);
     
+    // Left-Left case
     if (balance > 1 && getBalance(n->left) >= 0) {
         return rotateRight(n);
     }
     
+    // Left-Right case
     if (balance > 1 && getBalance(n->left) < 0) {
         n->left = rotateLeft(n->left);
         return rotateRight(n);
     }
     
+    // Right-Right case
     if (balance < -1 && getBalance(n->right) <= 0) {
         return rotateLeft(n);
     }
     
+    // Right-Left case
     if (balance < -1 && getBalance(n->right) > 0) {
         n->right = rotateRight(n->right);
         return rotateLeft(n);
@@ -430,7 +479,6 @@ node<T, B>* AVLTree<T, B>::deleteAVL(T key, node<T, B>* n) {
     
     return n;
 }
-
 #endif
 
 // Implementaciones comunes para ambas especializaciones
